@@ -1,0 +1,13 @@
+__pycache__/
+.pytest_cache/
+.venv/
+runtime/
+*.key
+*.sft-part
+*.sft-upload.json
+*.sft-download.json
+*.sft-download.json.tmp
+*.sft-upload.json.tmp
+build/
+dist/
+*.egg-info/
