@@ -1,0 +1,20 @@
+services:
+  server:
+    build: .
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ports: ["127.0.0.1:8443:8443"]
+    volumes:
+      - ./runtime/deploy/config:/config:ro
+      - ./runtime/deploy/storage:/data:rw
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=16m"]
+    pids_limit: 64
+    mem_limit: 512m
+    cpus: 1.0
+    ulimits:
+      nofile:
+        soft: 256
+        hard: 256
+    restart: unless-stopped

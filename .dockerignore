@@ -1,0 +1,4 @@
+*
+!Dockerfile
+!secure_transfer/
+!secure_transfer/*.py
