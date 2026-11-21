@@ -11,7 +11,7 @@ dependencies = []
 
 [project.optional-dependencies]
 gui = ["PySide6>=6.8,<7"]
-test = ["pytest>=8,<10"]
+test = ["pytest>=7.4,<10"]
 
 [tool.setuptools.packages.find]
 include = ["secure_transfer*"]

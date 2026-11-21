@@ -42,7 +42,7 @@ class Window(QMainWindow):
         self.files.setSelectionBehavior(QAbstractItemView.SelectRows);self.files.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.files.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.files.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch);self.files.horizontalHeader().setSectionResizeMode(3,QHeaderView.Stretch)
-        layout.addWidget(self.files,3);layout.addWidget(QLabel('传输任务 · 最多 3 个并发任务 · 暂停后可继续'))
+        layout.addWidget(self.files,2);layout.addWidget(QLabel('传输任务 · 最多 3 个并发任务 · 暂停后可继续'))
         self.tasks=QTableWidget(0,5);self.tasks.setHorizontalHeaderLabels(['任务','进度','速度','状态','操作'])
         self.tasks.horizontalHeader().setSectionResizeMode(0,QHeaderView.Stretch);self.tasks.horizontalHeader().setSectionResizeMode(1,QHeaderView.Stretch)
         self.tasks.setEditTriggers(QAbstractItemView.NoEditTriggers);layout.addWidget(self.tasks,2)

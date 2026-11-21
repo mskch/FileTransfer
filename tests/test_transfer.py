@@ -228,3 +228,76 @@ def test_download_no_overwrite(environment,tmp_path):
         fid=client.upload(path)
         with pytest.raises(FileExistsError):client.download(fid,target)
     assert target.read_bytes()==b'keep this'
+
+def test_simultaneous_upload_download(environment,tmp_path):
+    _,configs,_,_=environment
+    source=tmp_path/'mixed-original';source.write_bytes(os.urandom(2*CHUNK+1))
+    with Client(configs['alice']) as client:fid=client.upload(source)
+    barrier=threading.Barrier(2)
+    def upload():
+        with Client(configs['alice']) as client:
+            barrier.wait();return client.upload(source,tmp_path/'other-upload.json')
+    def download():
+        with Client(configs['alice']) as client:
+            barrier.wait();client.download(fid,tmp_path/'mixed-download')
+        return sha256(tmp_path/'mixed-download')==sha256(source)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        u=pool.submit(upload);d=pool.submit(download)
+        assert u.result() and d.result()
+
+def test_hard_server_restart(environment,tmp_path):
+    import time
+    root,configs,_,_=environment
+    with socket.socket() as probe:probe.bind(('127.0.0.1',0));port=probe.getsockname()[1]
+    config=json.loads((root/'server.json').read_text());config.update(port=port,storage=str(tmp_path/'restart-store'))
+    config_path=tmp_path/'server.json';config_path.write_text(json.dumps(config))
+    client_config=dict(configs['alice'],port=port)
+    def start():
+        proc=subprocess.Popen([sys.executable,'-m','secure_transfer.server','--config',str(config_path)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        for _ in range(100):
+            try:
+                with Client(client_config):pass
+                return proc
+            except OSError:time.sleep(.05)
+        proc.kill();proc.wait();raise RuntimeError('restart server failed')
+    source=tmp_path/'restart-source';source.write_bytes(os.urandom(2*CHUNK+31));stop=threading.Event()
+    def pause(done,total):
+        if done>=CHUNK:stop.set()
+    proc=start()
+    try:
+        with Client(client_config) as client:
+            with pytest.raises(Paused):client.upload(source,progress=pause,pause=stop)
+        proc.kill();proc.wait();proc=start()
+        with Client(client_config) as client:
+            offsets=[];fid=client.upload(source,progress=lambda n,t:offsets.append(n))
+            assert offsets[0]==CHUNK
+            client.download(fid,tmp_path/'restored')
+            assert sha256(tmp_path/'restored')==sha256(source)
+    finally:
+        proc.terminate();proc.wait(timeout=5)
+
+def test_trusted_but_unmapped_client(environment,tmp_path):
+    root,configs,_,loop=environment
+    config=json.loads((root/'server.json').read_text());config.update(port=0,storage=str(tmp_path/'unmapped'));config['users']=config['users'][:1]
+    async def start():
+        service=Service(config);server=await service.start()
+        return service,server.sockets[0].getsockname()[1]
+    service,port=asyncio.run_coroutine_threadsafe(start(),loop).result()
+    try:
+        with pytest.raises((EOFError,ConnectionError,ssl.SSLError)):Client(dict(configs['bob'],port=port)).connect()
+    finally:asyncio.run_coroutine_threadsafe(service.stop(),loop).result()
+
+def test_partial_frame_deadline(environment,tmp_path):
+    import time
+    root,configs,_,loop=environment
+    config=json.loads((root/'server.json').read_text());config.update(port=0,storage=str(tmp_path/'deadline'),idle_timeout=.2)
+    async def start():
+        service=Service(config);server=await service.start()
+        return service,server.sockets[0].getsockname()[1]
+    service,port=asyncio.run_coroutine_threadsafe(start(),loop).result()
+    client=Client(dict(configs['alice'],port=port)).connect()
+    try:
+        client.sock.sendall(b'SF');time.sleep(.4)
+        with pytest.raises((EOFError,ConnectionError,ssl.SSLError)):receive(client.sock)
+    finally:
+        client.close();asyncio.run_coroutine_threadsafe(service.stop(),loop).result()

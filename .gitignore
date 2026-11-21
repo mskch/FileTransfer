@@ -10,4 +10,5 @@ runtime/
 *.sft-upload.json.tmp
 build/
 dist/
+docs/
 *.egg-info/
